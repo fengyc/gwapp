@@ -12,7 +12,7 @@ from gevent.socket import create_connection
 import socket
 import struct
 import logging
-import dns
+import six
 
 SOCKS5_VER = 5
 
@@ -56,7 +56,7 @@ LOG = logging.getLogger(__file__)
 
 
 class NegotiateRequestPackage(object):
-    def __init__(self, ver=5, methods=(0)):
+    def __init__(self, ver=5, methods=(0,)):
         self.ver = ver,
         self.methods = methods,
         self.nmethod = len(methods),
@@ -186,6 +186,7 @@ class UDPRequestPackage(object):
 class Socks5Server(StreamServer):
     def __init__(self, *args, **kwargs):
         super(Socks5Server, self).__init__(*args, **kwargs)
+        LOG.debug('Socks5Server is serving at %s' % (self.address,))
 
     @staticmethod
     def forward(address, source, dest, callback=None):
@@ -207,7 +208,6 @@ class Socks5Server(StreamServer):
                     LOG.debug('%s -> %s is closed' % (address, dest_addr))
             except:
                 LOG.exception('%s -> unable to forward %s to %s' % (str(address), source_addr, dest_addr))
-        # LOG.debug('%s -> forwarding from %s to %s has stopped' % (address, source.getpeername(), dest.getpeername()))
         if callable(callback):
             callback(address)
 
@@ -216,10 +216,10 @@ class Socks5Server(StreamServer):
         LOG.info('%s -> disconnected' % str(address))
 
     def handle(self, sock, address):
-        LOG.debug('%s -> connected' % str(address))
+        LOG.debug('%s -> connecting' % str(address))
 
-        # 1. negotiate
-        LOG.debug('%s -> negotiate' % str(address))
+        # 1. negotiation
+        LOG.debug('%s -> negotiating' % str(address))
         req = NegotiateRequestPackage.unpack(sock.recv(4096))
         # TODO add negotiation support here
         resp = NegotiateResponsePackage()

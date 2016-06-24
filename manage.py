@@ -1,11 +1,11 @@
 # -*- coding:utf-8 -*-
-# Copyright (c) 2016 FENG Yingcai.
+# Copyright (c) 2016 Yingcai FENG.
 #
 # manage.py
 # 
 # Created by fengyc at 16/6/23
 
-from socks5 import Socks5Server
+from gwapp.protocols.socks5 import Socks5Server
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
