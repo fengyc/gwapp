@@ -16,10 +16,8 @@ HOST_CACHE = {}
 CACHE_TIMEOUT = 120
 
 
-
 def resolve(domain):
     if domain not in HOST_CACHE:
         LOG.debug('Resoling %s' % domain)
         addr = socket.gethostbyname(domain)
-        HOST_CACHE[domain] = addr
-        gevent.spawn_later()
+        return addr
