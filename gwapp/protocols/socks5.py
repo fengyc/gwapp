@@ -12,7 +12,6 @@ from gevent.socket import create_connection
 import socket
 import struct
 import logging
-import six
 
 SOCKS5_VER = 5
 
@@ -211,10 +210,6 @@ class Socks5Server(StreamServer):
         if callable(callback):
             callback(address)
 
-    @staticmethod
-    def forward_completed_callback(address):
-        LOG.info('%s -> disconnected' % str(address))
-
     def handle(self, sock, address):
         LOG.debug('%s -> connecting' % str(address))
 
@@ -238,12 +233,20 @@ class Socks5Server(StreamServer):
             except Exception as ex:
                 LOG.exception('%s -> unable to connect %s' % (str(address), str((req.dst_addr.decode(), req.dst_port))))
                 resp.rsp = 5    # connection refused
+        elif req.cmd == 2:  # bind
+            pass
+        elif req.cmd == 3:  # udp
+            pass
         else:
             resp.rsp = 7    # not support
         sock.sendall(resp.pack())
 
         # 3. forward
         if resp.rsp == 0:
-            forwarders = (gevent.spawn(Socks5Server.forward, address, sock, remote_sock, Socks5Server.forward_completed_callback),
-                              gevent.spawn(Socks5Server.forward, address, remote_sock, sock))
+            forwarders = (
+                gevent.spawn(Socks5Server.forward, address, sock, remote_sock),
+                gevent.spawn(Socks5Server.forward, address, remote_sock, sock))
             gevent.joinall(forwarders)
+
+        # 4. close
+        LOG.debug('%s -> close' % (address,))
