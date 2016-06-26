@@ -242,11 +242,11 @@ class Socks5Server(StreamServer):
                 LOG.exception('%s -> unable to connect %s' % (str(endpoint), str((req.dst_addr, req.dst_port))))
                 resp.rsp = 5    # connection refused
         elif req.cmd == 2:  # bind
-            pass
+            resp.rsp = 7   # not supported
         elif req.cmd == 3:  # udp
-            pass
+            resp.rsp = 7     # not supported
         else:
-            resp.rsp = 7    # not support
+            resp.rsp = 7    # not supported
         sock.sendall(resp.pack())
 
         # 3. forward
