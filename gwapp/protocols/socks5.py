@@ -12,6 +12,7 @@ from gevent.socket import create_connection
 import socket
 import struct
 import logging
+import six
 
 SOCKS5_VER = 5
 
@@ -90,11 +91,15 @@ class NegotiateResponsePackage(object):
 
 def _pack_addr(atyp, addr):
     if atyp == 1:
+        if isinstance(addr, six.string_types):
+            addr = socket.inet_aton(addr)
         data = struct.pack('!4s', addr)
     elif atyp == 3:
         ndst_addr = len(addr)
         data = struct.pack('!B%ss' % ndst_addr, ndst_addr, addr)
     elif atyp == 4:
+        if isinstance(addr, six.string_types):
+            addr = socket.inet_pton(socket.AF_INET6, addr)
         data = struct.pack('!16s', addr)
     return data
 
@@ -102,13 +107,16 @@ def _pack_addr(atyp, addr):
 def _unpack_addr(atyp, data, offset):
     if atyp == 1:
         addr, = struct.unpack_from('!4s', data, offset)
+        addr = socket.inet_ntoa(addr)
         offset += 4
     elif atyp == 3:
         naddr, = struct.unpack_from('!B', data, offset)
         addr, = struct.unpack_from('!%ss' % naddr, data, offset + 1)
+        addr = addr.decode()
         offset += 1 + naddr
     elif atyp == 4:
         addr, = struct.unpack_from('!16s', data, offset)
+        addr = socket.inet_ntop(socket.AF_INET6, addr)
         offset += 16
     return (addr, offset)
 
@@ -210,28 +218,28 @@ class Socks5Server(StreamServer):
         if callable(callback):
             callback(address)
 
-    def handle(self, sock, address):
-        LOG.debug('%s -> connecting' % str(address))
+    def handle(self, sock, endpoint):
+        LOG.debug('%s -> connecting' % str(endpoint))
 
         # 1. negotiation
-        LOG.debug('%s -> negotiating' % str(address))
+        LOG.debug('%s -> negotiating' % str(endpoint))
         req = NegotiateRequestPackage.unpack(sock.recv(4096))
         # TODO add negotiation support here
         resp = NegotiateResponsePackage()
         sock.sendall(resp.pack())
 
         # 2. request
-        LOG.debug('%s -> request' % str(address))
+        LOG.debug('%s -> request' % str(endpoint))
         req = RequestPackage.unpack(sock.recv(4096))
         resp = ReplyPackage()
         if req.cmd == 1:    # connect
             try:
-                remote_sock = create_connection((req.dst_addr.decode(), req.dst_port))
+                remote_sock = create_connection((req.dst_addr, req.dst_port))
                 resp.rsp = 0    # success
                 resp.bnd_addr = socket.inet_aton(remote_sock.getsockname()[0])
                 resp.bnd_port = remote_sock.getsockname()[1]
             except Exception as ex:
-                LOG.exception('%s -> unable to connect %s' % (str(address), str((req.dst_addr.decode(), req.dst_port))))
+                LOG.exception('%s -> unable to connect %s' % (str(endpoint), str((req.dst_addr, req.dst_port))))
                 resp.rsp = 5    # connection refused
         elif req.cmd == 2:  # bind
             pass
@@ -244,9 +252,9 @@ class Socks5Server(StreamServer):
         # 3. forward
         if resp.rsp == 0:
             forwarders = (
-                gevent.spawn(Socks5Server.forward, address, sock, remote_sock),
-                gevent.spawn(Socks5Server.forward, address, remote_sock, sock))
+                gevent.spawn(Socks5Server.forward, endpoint, sock, remote_sock),
+                gevent.spawn(Socks5Server.forward, endpoint, remote_sock, sock))
             gevent.joinall(forwarders)
 
         # 4. close
-        LOG.debug('%s -> close' % (address,))
+        LOG.debug('%s -> close' % (endpoint,))
