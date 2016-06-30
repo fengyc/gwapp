@@ -242,6 +242,14 @@ class Socks5Server(StreamServer):
                 LOG.exception('%s -> unable to connect %s' % (str(endpoint), str((req.dst_addr, req.dst_port))))
                 resp.rsp = 5    # connection refused
         elif req.cmd == 2:  # bind
+            try:
+                remote_sock = StreamServer((req.dst_addr, req.dst_port)).socket
+                resp.rsp = 0
+                resp.bnd_addr = remote_sock.getsockname()[0]
+                resp.bnd_port = remote_sock.getsockname()[1]
+            except Exception as ex:
+                LOG.exception('%s -> unable to bind %s' % ((req.dst_addr, req.dst_port),))
+                resp.rsp = 5
             resp.rsp = 7   # not supported
         elif req.cmd == 3:  # udp
             resp.rsp = 7     # not supported
